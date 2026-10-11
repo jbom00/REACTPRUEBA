@@ -1,0 +1,13 @@
+# netlify.toml  (va en la raíz del proyecto, junto a package.json)
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Si algún día agregas rutas (react-router), esto evita errores 404 al recargar
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
