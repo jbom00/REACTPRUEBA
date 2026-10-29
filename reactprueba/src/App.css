@@ -509,6 +509,55 @@ button:disabled { cursor: not-allowed; }
 @keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(0.3) rotate(0); } 50% { opacity: 1; transform: scale(1.2) rotate(90deg); } }
 .confetti-canvas { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
 
+/* ---------- Interruptores (inicio y panel de reglas) ---------- */
+.switch-row,
+.rule-card { position: relative; display: flex; align-items: center; gap: 14px; cursor: pointer; text-align: left; }
+.switch-row input,
+.rule-card input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.switch {
+  flex: none; position: relative; width: 52px; height: 30px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14); border: 1px solid var(--border);
+  transition: background 0.25s, box-shadow 0.25s;
+}
+.switch::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+input:checked + .switch { background: linear-gradient(135deg, #ffe27a, var(--gold-2)); box-shadow: 0 0 18px rgba(255, 170, 0, 0.45); }
+input:checked + .switch::after { transform: translateX(22px); }
+input:focus-visible + .switch { outline: 2px solid var(--water); outline-offset: 3px; }
+input:disabled + .switch { opacity: 0.5; }
+.switch-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.switch-text strong { font-size: 14px; }
+.switch-text small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+.rule-card {
+  width: 100%; padding: 16px 18px; border-radius: 18px;
+  background: var(--panel); border: 1px solid var(--border); backdrop-filter: blur(12px);
+  transition: border-color 0.25s, background 0.25s;
+  animation: rise-in 0.7s 0.3s both;
+}
+.rule-card:hover { background: rgba(255, 255, 255, 0.09); }
+.rule-card.rule-on { border-color: rgba(255, 200, 61, 0.6); background: rgba(255, 200, 61, 0.1); }
+.rule-card .switch-text strong { font-size: 15px; }
+.rule-card .switch-text small { font-size: 13px; }
+
+/* ---------- Números saltados ---------- */
+.field-wide { margin-top: 16px; }
+.field-wide span em { font-style: normal; font-weight: 500; opacity: 0.8; }
+.field.field-wide input.skip-input { font-size: 16px; font-weight: 600; text-align: left; padding: 12px 14px; letter-spacing: 0.3px; }
+.skip-hint { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.skip-info p { margin: 8px 0 0; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.skip-ok { color: #9fe8c2; }
+.skip-warn { color: var(--muted); }
+.skip-bad { color: #ff8fa8; }
+.winners-box { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.winners-box .chips { margin-top: 0; }
+.label-gold { color: var(--gold); }
+.btn-sm { padding: 10px 18px; font-size: 14px; border-radius: 12px; margin-top: 12px; }
+.result-lock { display: inline-block; margin-top: 8px; color: #ffe27a; font-weight: 600; }
+
 /* ---------- Centro de la ruleta: número en vivo ---------- */
 .wheel-hub { display: grid; place-items: center; }
 .hub-label, .hub-live { grid-area: 1 / 1; transition: opacity 0.15s; }

@@ -6,7 +6,7 @@ const rand = (a, b) => a + Math.random() * (b - a);
 
 const WAVE_PATH = 'M0 40 C150 0 450 80 600 40 C750 0 1050 80 1200 40 V120 H0 Z';
 
-function Resultado({ result, remaining, onClose }) {
+function Resultado({ result, remaining, excludeWinners, onClose }) {
     const isWinner = result.type === 'winner';
 
     const bubbles = useMemo(
@@ -65,7 +65,15 @@ function Resultado({ result, remaining, onClose }) {
                     <div className="trophy">🏆</div>
                     <div className="result-kicker kicker-gold">¡Tenemos ganador!</div>
                     <div className="result-number win-number">{result.number}</div>
-                    <p className="result-note">El tercer tiro decide la ronda. ¡Felicitaciones!</p>
+                    <p className="result-note">
+                        El tercer tiro decide la ronda. ¡Felicitaciones!
+                        {excludeWinners && (
+                            <>
+                                <br />
+                                <span className="result-lock">🔒 Este número sale de la ruleta y no podrá ganar otro premio.</span>
+                            </>
+                        )}
+                    </p>
                     <button type="button" className="btn btn-gold" onClick={onClose} autoFocus>
                         Nueva ronda ↻
                     </button>

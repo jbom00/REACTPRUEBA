@@ -1,14 +1,14 @@
 // src/componentes/Inicio.jsx
 import React from 'react';
 
-function Home({ onStart }) {
+function Home({ onStart, excludeWinners, onToggleExcludeWinners }) {
     return (
         <main className="home">
             {/* Encabezado de la iglesia */}
             <header className="church">
                 <span className="church-dove" aria-hidden="true">🕊️</span>
                 <h2 className="church-name">Iglesia Jehová Sama</h2>
-                <span className="church-dove church-dove-2 " aria-hidden="true">🕊️</span>
+                <span className="church-dove church-dove-2" aria-hidden="true">🕊️</span>
             </header>
 
             <div className="home-body">
@@ -44,6 +44,24 @@ function Home({ onStart }) {
                         <small>Nunca sale dos veces en la misma ronda</small>
                     </div>
                 </div>
+
+                {/* Regla del sorteo */}
+                <label className={`rule-card ${excludeWinners ? 'rule-on' : ''}`}>
+                    <input
+                        type="checkbox"
+                        checked={excludeWinners}
+                        onChange={(e) => onToggleExcludeWinners(e.target.checked)}
+                    />
+                    <span className="switch" aria-hidden="true" />
+                    <span className="switch-text">
+                        <strong>🔒 Excluir a los ganadores anteriores</strong>
+                        <small>
+                            {excludeWinners
+                                ? 'Activado: quien gane un premio sale de la ruleta y no podrá ganar otro.'
+                                : 'Desactivado: un ganador podría volver a ganar en otra ronda. Actívalo si hay varios premios.'}
+                        </small>
+                    </span>
+                </label>
 
                 <button type="button" className="btn btn-gold btn-xl" onClick={onStart}>
                     Ir a la ruleta →

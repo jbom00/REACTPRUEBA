@@ -4,10 +4,12 @@ import Home from './componentes/Inicio';
 import Wheel, { SPIN_DURATION } from './componentes/Ruleta';
 import Resultado from './componentes/Resultado';
 import { sonidos, setSoundEnabled } from './sonidos';
+import { MAX_SPAN, parseSkipped, buildNumbers, formatRuns } from './numeros';
 import './App.css';
 
 const MIN_NUMBERS = 3; // 2 al agua + 1 ganador
 const MAX_NUMBERS = 200;
+const EMPTY = [];
 const PRESETS = [
   [1, 10],
   [1, 20],
@@ -41,9 +43,14 @@ function parseInteger(value) {
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
 
-  // Rango
+  // Rango y números saltados
   const [minStr, setMinStr] = useState('1');
   const [maxStr, setMaxStr] = useState('20');
+  const [skipStr, setSkipStr] = useState('');
+
+  // Regla: los ganadores salen de la ruleta en las rondas siguientes
+  const [excludeWinners, setExcludeWinners] = useState(false);
+  const [winners, setWinners] = useState([]); // ganadores de la sesión
 
   // Ruleta
   const [rotation, setRotation] = useState(0);
@@ -71,20 +78,44 @@ function App() {
     []
   );
 
-  /* ---------- Validación del rango ---------- */
+  /* ---------- Rango, números saltados y ganadores excluidos ---------- */
   const min = parseInteger(minStr);
   const max = parseInteger(maxStr);
-  let error = null;
-  if (Number.isNaN(min) || Number.isNaN(max)) error = 'Ingresa números enteros en ambos campos.';
-  else if (max <= min) error = 'El máximo debe ser mayor que el mínimo.';
-  else if (max - min + 1 < MIN_NUMBERS) error = `Necesitas al menos ${MIN_NUMBERS} números (2 al agua + 1 ganador).`;
-  else if (max - min + 1 > MAX_NUMBERS) error = `Máximo ${MAX_NUMBERS} números por ruleta.`;
+  const parsed = useMemo(() => parseSkipped(skipStr), [skipStr]);
 
-  const numbers = useMemo(
-    () => (error ? [] : Array.from({ length: max - min + 1 }, (_, i) => min + i)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [error, min, max]
+  let rangeError = null;
+  if (Number.isNaN(min) || Number.isNaN(max)) rangeError = 'Ingresa números enteros en ambos campos.';
+  else if (max <= min) rangeError = 'El máximo debe ser mayor que el mínimo.';
+  else if (max - min + 1 > MAX_SPAN) rangeError = `El rango es demasiado amplio (máximo ${MAX_SPAN} números entre el mínimo y el máximo).`;
+
+  const lists = useMemo(
+    () => (rangeError ? { base: EMPTY, numbers: EMPTY } : buildNumbers(min, max, parsed.set, winners, excludeWinners)),
+    [rangeError, min, max, parsed, winners, excludeWinners]
   );
+
+  let error = rangeError;
+  let errorKind = rangeError ? 'range' : null;
+  if (!error) {
+    const nBase = lists.base.length;
+    if (nBase < MIN_NUMBERS) {
+      error = `Necesitas al menos ${MIN_NUMBERS} números disponibles (2 al agua + 1 ganador) y tienes ${nBase}.`;
+      errorKind = 'range';
+    } else if (nBase > MAX_NUMBERS) {
+      error = `Tienes ${nBase} números y el máximo es ${MAX_NUMBERS}. Acorta el rango o salta más números.`;
+      errorKind = 'range';
+    } else if (lists.numbers.length < MIN_NUMBERS) {
+      error = `Solo quedan ${lists.numbers.length} números porque los ganadores anteriores están excluidos.`;
+      errorKind = 'winners';
+    }
+  }
+
+  const numbers = useMemo(() => (error ? EMPTY : lists.numbers), [error, lists]);
+
+  const skippedInRange = useMemo(
+    () => (rangeError ? EMPTY : [...parsed.set].filter((n) => n >= min && n <= max).sort((a, b) => a - b)),
+    [rangeError, parsed, min, max]
+  );
+  const skippedOutside = rangeError ? 0 : parsed.set.size - skippedInRange.length;
 
   const rounds = useMemo(() => {
     const map = new Map();
@@ -95,16 +126,7 @@ function App() {
     return [...map.entries()].reverse();
   }, [history]);
 
-  if (currentPage === 'home') {
-    return (
-      <div className="app-shell">
-        <div className="bg-fx"><span /><span /><span /></div>
-        <Home onStart={() => setCurrentPage('roulette')} />
-      </div>
-    );
-  }
-
-  /* ---------- Acciones ---------- */
+  /* ---------- Acciones (definidas antes del return de la portada) ---------- */
   const resetRound = () => {
     setSpinCount(1);
     setDrawn([]);
@@ -115,9 +137,24 @@ function App() {
     resetRound(); // al cambiar el rango, la ronda en curso se reinicia
   };
 
+  const changeSkip = (e) => {
+    setSkipStr(e.target.value);
+    resetRound();
+  };
+
   const applyPreset = ([a, b]) => {
     setMinStr(String(a));
     setMaxStr(String(b));
+    resetRound();
+  };
+
+  const toggleExcludeWinners = (value) => {
+    setExcludeWinners(value);
+    resetRound(); // cambia la lista de números: la ronda en curso se reinicia
+  };
+
+  const returnWinners = () => {
+    setWinners([]);
     resetRound();
   };
 
@@ -147,8 +184,10 @@ function App() {
   const spin = () => {
     if (error || isSpinning || result) return;
 
-    // El ganador del tiro se elige UNA vez, entre los números que siguen en juego
+    // El número del tiro se elige UNA vez, entre los que siguen en juego
+    // (`numbers` ya no incluye saltados ni ganadores excluidos)
     const available = numbers.filter((n) => !drawn.includes(n));
+    if (available.length === 0) return;
     const pick = available[randomInt(available.length)];
     const idx = numbers.indexOf(pick);
 
@@ -174,6 +213,8 @@ function App() {
   const closeResult = () => {
     if (!result) return;
     if (result.type === 'winner') {
+      // el ganador se registra recién al cerrar, para que la ruleta no cambie detrás de la pantalla de victoria
+      setWinners((w) => (w.includes(result.number) ? w : [...w, result.number]));
       setSpinCount(1);
       setDrawn([]);
       setRoundNo((r) => r + 1);
@@ -194,7 +235,22 @@ function App() {
     setSpinCount(1);
     setDrawn([]);
     setRoundNo(1);
+    setWinners([]);
   };
+
+  /* ---------- Portada ---------- */
+  if (currentPage === 'home') {
+    return (
+      <div className="app-shell">
+        <div className="bg-fx"><span /><span /><span /></div>
+        <Home
+          onStart={() => setCurrentPage('roulette')}
+          excludeWinners={excludeWinners}
+          onToggleExcludeWinners={toggleExcludeWinners}
+        />
+      </div>
+    );
+  }
 
   const remaining = numbers.length - drawn.length;
   const isLast = spinCount === 3;
@@ -280,6 +336,11 @@ function App() {
               {spinLabel}
             </button>
             {error && <p className="error-msg">⚠ {error}</p>}
+            {errorKind === 'winners' && (
+              <button type="button" className="btn btn-gold btn-sm" onClick={returnWinners} disabled={isSpinning}>
+                Devolver los ganadores a la ruleta
+              </button>
+            )}
 
             {drawn.length > 0 && (
               <div className="agua-strip">
@@ -334,6 +395,45 @@ function App() {
                   </button>
                 ))}
               </div>
+
+              {/* Números saltados */}
+              <label className="field field-wide">
+                <span>
+                  Números saltados <em>(no vendidos o ausentes)</em>
+                </span>
+                <input
+                  type="text"
+                  className="skip-input"
+                  value={skipStr}
+                  onChange={changeSkip}
+                  placeholder="Ej: 7, 15, 30-35"
+                  disabled={isSpinning}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+              </label>
+              {skippedInRange.length === 0 && parsed.invalid.length === 0 && skippedOutside === 0 && (
+                <p className="skip-hint">Sepáralos con comas. Para varios seguidos usa un rango: 30-35.</p>
+              )}
+              {(skippedInRange.length > 0 || parsed.invalid.length > 0 || skippedOutside > 0) && (
+                <div className="skip-info">
+                  {skippedInRange.length > 0 && (
+                    <p className="skip-ok">
+                      ⏭ Se {skippedInRange.length === 1 ? 'salta' : 'saltan'} <strong>{skippedInRange.length}</strong>{' '}
+                      {skippedInRange.length === 1 ? 'número' : 'números'}: {formatRuns(skippedInRange)}
+                    </p>
+                  )}
+                  {skippedOutside > 0 && (
+                    <p className="skip-warn">
+                      {skippedOutside} {skippedOutside === 1 ? 'número está' : 'números están'} fuera del rango y se{' '}
+                      {skippedOutside === 1 ? 'ignora' : 'ignoran'}.
+                    </p>
+                  )}
+                  {parsed.invalid.length > 0 && <p className="skip-bad">No entendí: {parsed.invalid.join(', ')}</p>}
+                </div>
+              )}
+
               {!error && (
                 <div className="stats">
                   <div>
@@ -346,8 +446,48 @@ function App() {
                   </div>
                   <div>
                     <strong>{numbers.length}</strong>
-                    <small>total</small>
+                    <small>en ruleta</small>
                   </div>
+                </div>
+              )}
+            </div>
+
+            <div className="panel">
+              <h2 className="panel-title">Reglas del sorteo</h2>
+              <label className="switch-row">
+                <input
+                  type="checkbox"
+                  checked={excludeWinners}
+                  onChange={(e) => toggleExcludeWinners(e.target.checked)}
+                  disabled={isSpinning}
+                />
+                <span className="switch" aria-hidden="true" />
+                <span className="switch-text">
+                  <strong>Excluir ganadores anteriores</strong>
+                  <small>
+                    {excludeWinners
+                      ? 'Quien gana sale de la ruleta y no puede ganar otro premio.'
+                      : 'Un ganador puede volver a ganar en las rondas siguientes.'}
+                  </small>
+                </span>
+              </label>
+              {winners.length > 0 && (
+                <div className="winners-box">
+                  <span className="agua-strip-label label-gold">
+                    🏆 Ganadores{excludeWinners ? ' (fuera de la ruleta)' : ''}
+                  </span>
+                  <div className="chips">
+                    {winners.map((w) => (
+                      <span key={w} className="chip chip-winner">
+                        🏆 <strong>{w}</strong>
+                      </span>
+                    ))}
+                  </div>
+                  {excludeWinners && (
+                    <button type="button" className="link-danger" onClick={returnWinners} disabled={isSpinning}>
+                      Devolver ganadores a la ruleta
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -382,7 +522,9 @@ function App() {
         </div>
       </div>
 
-      {result && <Resultado result={result} remaining={remaining} onClose={closeResult} />}
+      {result && (
+        <Resultado result={result} remaining={remaining} excludeWinners={excludeWinners} onClose={closeResult} />
+      )}
     </div>
   );
 }
